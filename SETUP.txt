@@ -1,4 +1,4 @@
-HABITFLOW + SUPABASE — SIMPLE SETUP
+HABITTRAKT + SUPABASE — SIMPLE SETUP
 
 1. Open config.js in a text editor.
 

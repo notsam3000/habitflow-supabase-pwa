@@ -1,10 +1,10 @@
 const { createClient } = window.supabase;
-const cfg = window.HABITFLOW_CONFIG || {};
+const cfg = window.HABITTRAKT_CONFIG || {};
 const configured = cfg.SUPABASE_URL && cfg.SUPABASE_PUBLISHABLE_KEY &&
   !cfg.SUPABASE_URL.includes("PASTE_") && !cfg.SUPABASE_PUBLISHABLE_KEY.includes("PASTE_");
 
 const sb = configured ? createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY) : null;
-const LOCAL_KEY = "habitflow-local-v2";
+const LOCAL_KEY = "habittrakt-local-v2";
 
 let data = { habits: [], done: {} };
 let selected = new Date();
@@ -74,7 +74,7 @@ async function pullCloud(){
 
 function subscribeRealtime(){
   if(channel) sb.removeChannel(channel);
-  channel=sb.channel("habitflow-user-"+currentUser.id)
+  channel=sb.channel("habittrakt-user-"+currentUser.id)
     .on("postgres_changes",{event:"*",schema:"public",table:"habits",filter:"user_id=eq."+currentUser.id},()=>pullCloud().then(render))
     .on("postgres_changes",{event:"*",schema:"public",table:"habit_completions",filter:"user_id=eq."+currentUser.id},()=>pullCloud().then(render))
     .subscribe();
