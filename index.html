@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f9f9ff">
+  <meta name="description" content="HabitFlow — a simple, calm habit tracker.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg">
+  <title>HabitFlow</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="authPage" class="auth-page hidden">
+  <div class="auth-card">
+    <div class="auth-brand">HabitFlow</div>
+    <h1 id="authTitle">Welcome back</h1>
+    <p id="authSubtitle">Sign in to sync your habits across devices.</p>
+    <form id="authForm">
+      <label>Email</label>
+      <input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com">
+      <label>Password</label>
+      <input id="authPassword" type="password" autocomplete="current-password" required minlength="6" placeholder="At least 6 characters">
+      <button class="primary" id="authSubmit">Sign in</button>
+    </form>
+    <button class="auth-switch" id="authSwitch">Need an account? Sign up</button>
+    <p id="authMessage" class="auth-message"></p>
+  </div>
+</div>
+<main class="app hidden">
+    <header class="topbar">
+      <div>
+        <div class="brand">HabitFlow</div>
+        <h1 id="pageTitle">Today</h1>
+      </div>
+      <div class="account-area"><span id="userEmail"></span><button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙</button></div>
+    </header>
+
+    <section id="homePage">
+      <div class="week-header">
+        <button class="circle-btn" id="prevWeek" aria-label="Previous week">‹</button>
+        <button class="month-label" id="monthLabel"></button>
+        <button class="circle-btn" id="nextWeek" aria-label="Next week">›</button>
+      </div>
+
+      <div id="week" class="week"></div>
+
+      <div class="sync-status" id="syncStatus">Cloud sync ready</div>
+      <div class="section-head">
+        <div>
+          <h2>Habits</h2>
+          <p id="completionSummary">0 of 0 completed</p>
+        </div>
+        <button id="addBtn" class="text-btn">＋ Add</button>
+      </div>
+
+      <div id="habitList" class="habit-list"></div>
+
+      <div class="home-footer">
+        <span id="selectedLabel"></span>
+        <button id="todayBtn">Today</button>
+      </div>
+    </section>
+
+    <section id="statsPage" class="hidden">
+      <div class="stats-grid">
+        <article class="stat-card">
+          <strong id="completionRate">0%</strong>
+          <span>28-day completion</span>
+        </article>
+        <article class="stat-card">
+          <strong id="bestStreak">0</strong>
+          <span>Best current streak</span>
+        </article>
+      </div>
+
+      <article class="card">
+        <h2>Last 4 weeks</h2>
+        <p class="card-subtitle">Every square is one day.</p>
+        <div id="heatmap" class="heatmap"></div>
+        <div class="legend"><span>Less</span><i></i><i></i><i></i><i></i><i></i><span>More</span></div>
+      </article>
+
+      <article class="card">
+        <h2>By habit</h2>
+        <p class="card-subtitle">Your recent consistency.</p>
+        <div id="habitStats"></div>
+      </article>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-page="home"><span>⌂</span><b>Home</b></button>
+    <button class="nav-item" data-page="stats"><span>▥</span><b>Stats</b></button>
+  </nav>
+
+  <div id="modalLayer"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
+</body>
+</html>

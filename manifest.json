@@ -1,0 +1,10 @@
+{
+  "name":"HabitFlow",
+  "short_name":"HabitFlow",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#f9f9ff",
+  "theme_color":"#6750a4",
+  "description":"A simple minimal habit tracker.",
+  "icons":[{"src":"icons/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
