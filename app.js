@@ -83,9 +83,10 @@ function subscribeRealtime(){
 async function addHabit(name){
   const clean=name.trim();if(!clean)return;
   setStatus("Saving…",true);
-  const {data:h,error}=await sb.from("habits").insert({user_id:currentUser.id,name:clean}).select("id,name").single();
+  const {error}=await sb.from("habits").insert({user_id:currentUser.id,name:clean});
   if(error){setStatus("Could not save");alert(error.message);return}
-  data.habits.push({id:h.id,name:h.name});localSave();setStatus("Synced");render();
+  await pullCloud();
+  render();
 }
 
 async function toggle(id){
