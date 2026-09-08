@@ -1,4 +1,4 @@
-// HabitFlow Supabase configuration.
+// HabitTrakt Supabase configuration.
 // Put your Supabase Project URL and Publishable key here.
 // Do NOT put a secret/service-role key here.
 window.HABITTRAKT_CONFIG = {
