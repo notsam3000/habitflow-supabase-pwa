@@ -1,34 +1,14 @@
-HABITTRAKT + SUPABASE — SIMPLE SETUP
+HABITFLOW SUPABASE SETUP
 
-1. Open config.js in a text editor.
+1. Put your Project URL and Publishable key into config.js.
+2. In Supabase SQL Editor, run SUPABASE_MIGRATION_REORDER.sql ONCE.
+3. Open the app through localhost or an HTTPS website.
+4. Sign in with the same account on PC and phone.
 
-2. Replace:
-   PASTE_YOUR_PROJECT_URL_HERE
-   with your Supabase Project URL.
+REORDERING
+- Desktop: drag a habit using the dotted handle.
+- Phone: open the ⋯ menu on a habit and use Move up / Move down.
+- The order is saved to Supabase, so the same order appears on your other devices.
 
-3. Replace:
-   PASTE_YOUR_PUBLISHABLE_KEY_HERE
-   with your Supabase Publishable key.
-
-4. Save config.js.
-
-5. Run the app through a local web server or deploy it to a normal HTTPS website.
-   Do not rely on opening index.html with file:// for PWA/service-worker features.
-
-6. Open the app on your PC and create an account.
-
-7. On your phone, open the same deployed app and sign in with the same account.
-   Your habits/checkmarks will be loaded from Supabase.
-
-IMPORTANT:
-- Use the Publishable key only.
-- NEVER put the Supabase secret/service-role key in config.js.
-- You already ran the database SQL from the earlier step.
-
-If you want realtime updates while both devices are open, run this additional SQL
-in Supabase SQL Editor:
-
-alter publication supabase_realtime add table public.habits;
-alter publication supabase_realtime add table public.habit_completions;
-
-The app already subscribes to those changes.
+IMPORTANT
+Use only the Supabase Project URL and Publishable key in config.js. Never use the secret/service-role key.

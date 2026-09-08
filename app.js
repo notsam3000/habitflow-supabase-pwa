@@ -1,10 +1,10 @@
 const { createClient } = window.supabase;
-const cfg = window.HABITTRAKT_CONFIG || {};
+const cfg = window.HABITFLOW_CONFIG || {};
 const configured = cfg.SUPABASE_URL && cfg.SUPABASE_PUBLISHABLE_KEY &&
   !cfg.SUPABASE_URL.includes("PASTE_") && !cfg.SUPABASE_PUBLISHABLE_KEY.includes("PASTE_");
 
 const sb = configured ? createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY) : null;
-const LOCAL_KEY = "habittrakt-local-v2";
+const LOCAL_KEY = "habitflow-local-v2";
 
 let data = { habits: [], done: {} };
 let selected = new Date();
@@ -61,32 +61,58 @@ async function startApp(){
 
 async function pullCloud(){
   setStatus("Syncing…",true);
-  const {data:habits,error:he}=await sb.from("habits").select("id,name,created_at").eq("user_id",currentUser.id).order("created_at");
-  if(he){setStatus("Sync error");console.error(he);return}
+  const {data:habits,error:he}=await sb.from("habits").select("id,name,created_at,sort_order").eq("user_id",currentUser.id).order("sort_order",{ascending:true}).order("created_at",{ascending:true});
+  if(he){setStatus("Sync error");console.error(he);return false}
   const {data:completions,error:ce}=await sb.from("habit_completions").select("habit_id,completed_date").eq("user_id",currentUser.id);
-  if(ce){setStatus("Sync error");console.error(ce);return}
-  data.habits=(habits||[]).map(h=>({id:h.id,name:h.name}));
+  if(ce){setStatus("Sync error");console.error(ce);return false}
+
+  const remoteHabits=habits||[];
+  // Never let an empty cloud response wipe a browser's existing local habits.
+  if(remoteHabits.length===0 && data.habits.length>0){
+    const rows=data.habits.map((h,i)=>({user_id:currentUser.id,name:h.name,sort_order:i}));
+    const {data:created,error:ie}=await sb.from("habits").insert(rows).select("id,name,sort_order");
+    if(ie){setStatus("Could not sync");console.error(ie);return false}
+    const oldHabits=[...data.habits],oldDone={...data.done};
+    data.habits=(created||[]).map((h,i)=>({id:h.id,name:h.name,sort_order:h.sort_order??i}));data.done={};
+    const completionRows=[];
+    data.habits.forEach((h,i)=>Object.keys(oldDone[oldHabits[i]?.id]||{}).filter(k=>oldDone[oldHabits[i]?.id]?.[k]).forEach(date=>completionRows.push({user_id:currentUser.id,habit_id:h.id,completed_date:date})));
+    if(completionRows.length) await sb.from("habit_completions").upsert(completionRows,{onConflict:"habit_id,completed_date"});
+    completionRows.forEach(c=>{data.done[c.habit_id]??={};data.done[c.habit_id][c.completed_date]=true});
+    localSave();setStatus("Synced");return true;
+  }
+
+  data.habits=remoteHabits.map((h,i)=>({id:h.id,name:h.name,sort_order:h.sort_order??i}));
   data.done={};
   (completions||[]).forEach(c=>{data.done[c.habit_id]??={};data.done[c.habit_id][c.completed_date]=true});
-  localSave();
-  setStatus("Synced");
+  localSave();setStatus("Synced");return true;
 }
-
 function subscribeRealtime(){
   if(channel) sb.removeChannel(channel);
-  channel=sb.channel("habittrakt-user-"+currentUser.id)
-    .on("postgres_changes",{event:"*",schema:"public",table:"habits",filter:"user_id=eq."+currentUser.id},()=>pullCloud().then(render))
-    .on("postgres_changes",{event:"*",schema:"public",table:"habit_completions",filter:"user_id=eq."+currentUser.id},()=>pullCloud().then(render))
+  channel=sb.channel("habitflow-user-"+currentUser.id)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"habits",filter:"user_id=eq."+currentUser.id},payload=>{
+      const h=payload.new;if(!data.habits.some(x=>x.id===h.id)){data.habits.push({id:h.id,name:h.name,sort_order:h.sort_order??data.habits.length});data.habits.sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));localSave();render()}setStatus("Synced");
+    })
+    .on("postgres_changes",{event:"UPDATE",schema:"public",table:"habits",filter:"user_id=eq."+currentUser.id},payload=>{
+      const h=payload.new,local=data.habits.find(x=>x.id===h.id);if(local){local.name=h.name;local.sort_order=h.sort_order??local.sort_order;data.habits.sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));localSave();render()}setStatus("Synced");
+    })
+    .on("postgres_changes",{event:"DELETE",schema:"public",table:"habits"},payload=>{
+      const id=payload.old.id;data.habits=data.habits.filter(x=>x.id!==id);delete data.done[id];localSave();render();setStatus("Synced");
+    })
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"habit_completions",filter:"user_id=eq."+currentUser.id},payload=>{
+      const c=payload.new;data.done[c.habit_id]??={};data.done[c.habit_id][c.completed_date]=true;localSave();render();setStatus("Synced");
+    })
+    .on("postgres_changes",{event:"DELETE",schema:"public",table:"habit_completions"},payload=>{
+      const c=payload.old;if(data.done[c.habit_id])delete data.done[c.habit_id][c.completed_date];localSave();render();setStatus("Synced");
+    })
     .subscribe();
 }
-
 async function addHabit(name){
   const clean=name.trim();if(!clean)return;
   setStatus("Saving…",true);
-  const {error}=await sb.from("habits").insert({user_id:currentUser.id,name:clean});
+  const nextOrder=data.habits.length;
+  const {data:h,error}=await sb.from("habits").insert({user_id:currentUser.id,name:clean,sort_order:nextOrder}).select("id,name,sort_order").single();
   if(error){setStatus("Could not save");alert(error.message);return}
-  await pullCloud();
-  render();
+  data.habits.push({id:h.id,name:h.name,sort_order:h.sort_order??nextOrder});localSave();setStatus("Synced");render();
 }
 
 async function toggle(id){
@@ -139,7 +165,8 @@ function render(){
   document.getElementById("completionSummary").textContent=`${count} of ${data.habits.length} completed`;
   document.getElementById("selectedLabel").textContent=selected.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
   document.getElementById("habitList").innerHTML=data.habits.length?data.habits.map(h=>`
-    <div class="habit">
+    <div class="habit" draggable="true" data-habit-row="${h.id}">
+      <span class="drag-handle" draggable="false" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>
       <button class="check ${data.done[h.id]?.[sk]?"done":""}" data-toggle="${h.id}">${data.done[h.id]?.[sk]?"✓":""}</button>
       <button class="name" data-toggle="${h.id}">${esc(h.name)}</button>
       <button class="more" data-menu="${h.id}">⋯</button>
@@ -165,6 +192,35 @@ function renderStats(){
   }).join(""):`<p style="color:var(--muted)">Add a habit to see statistics.</p>`;
 }
 
+let draggedHabitId=null;
+
+async function persistHabitOrder(){
+  setStatus("Saving order…",true);
+  const results=await Promise.all(data.habits.map((h,i)=>sb.from("habits").update({sort_order:i}).eq("id",h.id).eq("user_id",currentUser.id)));
+  const bad=results.find(r=>r.error);
+  if(bad){setStatus("Order not saved");alert(bad.error.message);return false}
+  data.habits.forEach((h,i)=>h.sort_order=i);
+  localSave();setStatus("Synced");return true;
+}
+
+async function moveHabit(id,direction){
+  const i=data.habits.findIndex(h=>h.id===id), j=i+direction;
+  if(i<0||j<0||j>=data.habits.length)return;
+  [data.habits[i],data.habits[j]]=[data.habits[j],data.habits[i]];
+  data.habits.forEach((h,n)=>h.sort_order=n);localSave();render();
+  await persistHabitOrder();
+}
+
+async function finishDrag(targetId){
+  if(!draggedHabitId||draggedHabitId===targetId)return;
+  const from=data.habits.findIndex(h=>h.id===draggedHabitId);
+  const to=data.habits.findIndex(h=>h.id===targetId);
+  if(from<0||to<0)return;
+  const [moved]=data.habits.splice(from,1);data.habits.splice(to,0,moved);
+  data.habits.forEach((h,i)=>h.sort_order=i);localSave();render();
+  await persistHabitOrder();
+}
+
 function modal(html){
   const layer=document.getElementById("modalLayer");
   layer.innerHTML=`<div class="modal-bg" id="modalBg"><div class="modal">${html}</div></div>`;
@@ -181,9 +237,13 @@ function addModal(){
 function menu(id){
   const h=data.habits.find(x=>x.id===id);
   modal(`<div class="modal-head"><h2>${esc(h.name)}</h2><button class="circle-btn" id="close">×</button></div>
+  <button class="action" id="up">↑ <span>Move up</span></button>
+  <button class="action" id="down">↓ <span>Move down</span></button>
   <button class="action" id="rename">✎ <span>Rename</span></button>
   <button class="action danger" id="delete">⌫ <span>Delete habit</span></button>`);
   document.getElementById("close").onclick=closeModal;
+  document.getElementById("up").onclick=async()=>{closeModal();await moveHabit(id,-1)};
+  document.getElementById("down").onclick=async()=>{closeModal();await moveHabit(id,1)};
   document.getElementById("rename").onclick=async()=>{closeModal();await rename(id)};
   document.getElementById("delete").onclick=async()=>{closeModal();await removeHabit(id)};
 }
@@ -242,4 +302,13 @@ document.addEventListener("click",e=>{
   const m=e.target.closest("[data-menu]");if(m)menu(m.dataset.menu);
   if(e.target.id==="emptyAdd")addModal();
 });
+document.addEventListener("dragstart",e=>{
+  const row=e.target.closest("[data-habit-row]");if(!row)return;
+  draggedHabitId=row.dataset.habitRow;row.classList.add("dragging");
+  if(e.dataTransfer){e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",draggedHabitId)}
+});
+document.addEventListener("dragend",e=>{const row=e.target.closest("[data-habit-row]");if(row)row.classList.remove("dragging");draggedHabitId=null;document.querySelectorAll("[data-habit-row]").forEach(x=>x.classList.remove("drag-over"))});
+document.addEventListener("dragover",e=>{const row=e.target.closest("[data-habit-row]");if(!row||!draggedHabitId)return;e.preventDefault();document.querySelectorAll("[data-habit-row]").forEach(x=>x.classList.remove("drag-over"));if(row.dataset.habitRow!==draggedHabitId)row.classList.add("drag-over")});
+document.addEventListener("drop",async e=>{const row=e.target.closest("[data-habit-row]");if(!row)return;e.preventDefault();await finishDrag(row.dataset.habitRow);draggedHabitId=null});
+
 init();

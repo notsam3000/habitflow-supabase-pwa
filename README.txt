@@ -1,4 +1,4 @@
-HABITTRAKT — ZERO-BUILD SUPABASE PWA
+HABITFLOW — ZERO-BUILD SUPABASE PWA
 
 Plain HTML/CSS/JS. No React, Node, npm, or build process.
 
